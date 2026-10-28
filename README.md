@@ -13,7 +13,7 @@ Record **audio only** from your Zoom and Microsoft Teams meetings on Windows: wh
 
 ## Download
 
-Get `MeetingAudioRecorder.exe` (about 150 MB) from the [latest release](../../releases/latest) and run it. You don't need to install anything. It takes several seconds to open while it unpacks.
+Get `MeetingAudioRecorder.exe` (about 100 MB) from the [latest release](../../releases/latest) and run it. You don't need to install anything. It takes several seconds to open while it unpacks.
 
 > Windows may show a "Windows protected your PC" warning because the app isn't code-signed. Click **More info → Run anyway**. If you'd rather not, you can [run it from source](#run-from-source) instead.
 
