@@ -1,0 +1,24 @@
+[project]
+name = "meeting-audio-recorder"
+dynamic = ["version"]
+description = "Record Zoom and Teams meeting audio plus your microphone on Windows"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = ["PyAudioWPatch>=0.2.12", "soundfile>=0.13", "soxr>=0.5", "numpy>=1.26"]
+
+[project.scripts]
+meeting-recorder = "meeting_recorder.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/zimba7768/meeting-audio-recorder"
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = { attr = "meeting_recorder.__version__" }
+
+[tool.setuptools]
+packages = ["meeting_recorder"]

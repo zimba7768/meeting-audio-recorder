@@ -1,0 +1,4 @@
+PyAudioWPatch>=0.2.12
+soundfile>=0.13
+soxr>=0.5
+numpy>=1.26

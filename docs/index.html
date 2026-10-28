@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meeting Audio Recorder</title>
+<meta name="description" content="Free, open-source Windows app that records audio from your Zoom and Teams meetings, including your microphone.">
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --text: #1d1d1f; --muted: #5f6368; --line: #e3e3e0;
+    --accent: #0a7c3e; --accent-text: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #141414; --card: #1e1e1e; --text: #ececec; --muted: #a0a0a0; --line: #2e2e2e;
+            --accent: #3ccf7a; --accent-text: #0b1a11; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 56px 16px 72px; }
+  h1 { font-size: clamp(2rem, 5vw, 2.8rem); line-height: 1.15; margin: 0 0 12px; letter-spacing: -0.02em; }
+  h2 { font-size: 1.35rem; margin: 48px 0 12px; }
+  p.lead { font-size: 1.2rem; color: var(--muted); margin: 0 0 28px; max-width: 40em; }
+  .buttons { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 40px; }
+  .btn { display: inline-block; padding: 12px 22px; border-radius: 10px; text-decoration: none; font-weight: 600;
+         border: 1px solid var(--line); color: var(--text); background: var(--card); }
+  .btn.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  img.shot { display: block; max-width: 100%; height: auto; margin: 0 auto; border-radius: 10px;
+             box-shadow: 0 8px 30px rgba(0,0,0,.15); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+  .card h3 { margin: 0 0 6px; font-size: 1.05rem; }
+  .card p { margin: 0; color: var(--muted); font-size: .97rem; }
+  ol { padding-left: 1.3em; } li { margin: 6px 0; }
+  .note { border-left: 4px solid var(--accent); background: var(--card); padding: 14px 18px; border-radius: 0 10px 10px 0; }
+  code { font-family: ui-monospace, Consolas, monospace; font-size: .92em; background: var(--card);
+         border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; }
+  a { color: var(--accent); }
+  footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Meeting Audio Recorder</h1>
+  <p class="lead">Record audio only from your Zoom and Microsoft Teams meetings on Windows: the other people's voices and your own microphone, saved as one MP3 per meeting. It's free and open source.</p>
+
+  <div class="buttons">
+    <a class="btn primary" href="https://github.com/zimba7768/meeting-audio-recorder/releases/latest">Download for Windows</a>
+    <a class="btn" href="https://github.com/zimba7768/meeting-audio-recorder">View source on GitHub</a>
+  </div>
+
+  <img class="shot" src="screenshot.png" width="466" height="344" alt="The Meeting Audio Recorder window showing microphone and speaker choices, level meters and a Stop recording button">
+
+  <h2>What it does</h2>
+  <div class="grid">
+    <div class="card"><h3>Records meetings automatically</h3><p>Starts when a Zoom or Teams meeting begins and saves when it ends.</p></div>
+    <div class="card"><h3>Captures both sides</h3><p>Records what you hear through your speakers or headset, plus your USB mic, mixed into one file.</p></div>
+    <div class="card"><h3>Stays on your PC</h3><p>It doesn't use bots, plugins, accounts or the cloud. Files are saved to <code>Documents\Meeting Recordings</code>.</p></div>
+    <div class="card"><h3>Small files</h3><p>About 1 MB per minute as MP3. WAV and FLAC are also available, plus optional separate tracks.</p></div>
+  </div>
+
+  <h2>Get started</h2>
+  <ol>
+    <li>Download <code>MeetingAudioRecorder.exe</code> and run it. If Windows SmartScreen warns you, choose <em>More info → Run anyway</em>.</li>
+    <li>Pick your microphone and the speakers or headset you hear meetings through.</li>
+    <li>Leave <em>Automatically record Zoom and Teams meetings</em> ticked and keep the window open.</li>
+    <li>Join a meeting. When you leave, the recording is saved.</li>
+  </ol>
+
+  <h2>How it works</h2>
+  <p>The app uses Windows' built-in <strong>WASAPI loopback</strong> to capture the audio going to your speakers, and records your microphone at the same time. To spot meetings, it checks the microphone-usage information Windows already keeps (the same information behind the mic icon in the taskbar). Zoom and Teams hold the mic open for the whole meeting, even while you're muted.</p>
+
+  <h2>Please get consent</h2>
+  <p class="note">Recording laws vary, and many places require everyone on the call to agree. Tell participants you're recording, and follow your organization's policies.</p>
+
+  <footer>MIT licensed · <a href="https://github.com/zimba7768/meeting-audio-recorder/issues">Report an issue</a></footer>
+</main>
+</body>
+</html>
