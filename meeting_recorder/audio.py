@@ -144,11 +144,12 @@ class Recorder:
     """Records meeting audio + microphone. Call start(), then stop() to get the saved Recording."""
 
     def __init__(self, out_dir, mic_index=None, speaker_index=None, fmt="mp3",
-                 mic_gain=1.0, meeting_gain=1.0):
+                 own_folder=True, mic_gain=1.0, meeting_gain=1.0):
         self.out_dir = Path(out_dir)
         self.mic_index = mic_index
         self.speaker_index = speaker_index
         self.fmt = fmt
+        self.own_folder = own_folder  # put each recording in its own "<date> <time> <label>" folder
         self.mic_gain = mic_gain
         self.meeting_gain = meeting_gain
         self.started_at = None
@@ -168,9 +169,24 @@ class Recorder:
         """Peak level (0..1) of the latest buffer for 'meeting' and 'mic'."""
         return {name: t.level for name, t in self._tracks.items()}
 
+    def _new_base(self, label):
+        """Path (without extension) for a new recording, e.g. .../2026-10-28 14-30 Teams/2026-10-28 14-30 Teams.
+
+        Adds " (2)", " (3)"… rather than overwrite an earlier recording from the same minute.
+        """
+        stamp = f"{time.strftime('%Y-%m-%d %H-%M')} {label}"
+        n = 1
+        while True:
+            name = stamp if n == 1 else f"{stamp} ({n})"
+            folder = self.out_dir / name if self.own_folder else self.out_dir
+            taken = folder.exists() if self.own_folder else Path(f"{folder / name}.{self.fmt}").exists()
+            if not taken:
+                folder.mkdir(parents=True, exist_ok=True)
+                return folder / name
+            n += 1
+
     def start(self, label="Meeting"):
-        self.out_dir.mkdir(parents=True, exist_ok=True)
-        self._base = self.out_dir / f"{time.strftime('%Y-%m-%d %H-%M')} {label}"
+        self._base = self._new_base(label)
         self._p = pyaudio.PyAudio()
         try:
             wasapi = self._p.get_host_api_info_by_type(pyaudio.paWASAPI)
@@ -196,6 +212,10 @@ class Recorder:
             self._tracks["mic"] = _Track(self._p, mic, f"{self._base} - mic.flac")
         except Exception:
             self._close_streams()
+            for track in ("meeting", "mic"):
+                Path(f"{self._base} - {track}.flac").unlink(missing_ok=True)
+            if self.own_folder and not any(self._base.parent.iterdir()):
+                self._base.parent.rmdir()
             raise
         self.started_at = time.monotonic()
         return self

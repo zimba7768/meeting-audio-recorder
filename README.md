@@ -23,7 +23,16 @@ Get `MeetingAudioRecorder.exe` (about 100 MB) from the [latest release](../../re
 2. Choose your **Microphone** (your USB mic) and the **Meeting audio from** device (the speakers or headset you hear the meeting through). Leave either on *System default* to follow Windows.
 3. Leave **Automatically record Zoom and Teams meetings** ticked and keep the window open (minimizing it is fine).
 4. Join a meeting. The status line switches to *"Zoom meeting — 0:00:12"*, and the level bars move for **Meeting** and **You**.
-5. When you leave the meeting, the recording is saved to `Documents\Meeting Recordings` as e.g. `2026-10-28 14-30 Teams.mp3`. A few minutes later, `2026-10-28 14-30 Teams.txt` appears next to it.
+5. When you leave the meeting, the recording is saved in its own folder, named with the date, time and app:
+
+   ```
+   Documents\Meeting Recordings\
+     2026-10-28 14-30 Teams\
+       2026-10-28 14-30 Teams.mp3
+       2026-10-28 14-30 Teams.txt      ← appears a few minutes later
+   ```
+
+   Untick **Put each meeting in its own folder** to save everything straight into the **Save to** folder instead.
 
 You can also press **Start recording** / **Stop recording** at any time to record by hand, or use **Transcribe a file…** to make a transcript of any audio file you already have.
 
@@ -88,6 +97,7 @@ python -m meeting_recorder --list-devices           # show mics and speakers
 python -m meeting_recorder --cli                    # record now, Ctrl+C to stop
 python -m meeting_recorder --auto --mic 30          # wait for meetings, use mic #30
 python -m meeting_recorder --cli --format flac --keep-tracks --out D:\Recordings
+python -m meeting_recorder --cli --no-folders       # don't make a folder per meeting
 python -m meeting_recorder --auto --transcribe --vocabulary "CUI, DFARS, CMMC"   # record and transcribe every meeting
 python -m meeting_recorder --transcribe-file "old meeting.mp3"   # transcribe an existing file
 ```

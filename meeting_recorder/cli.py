@@ -19,6 +19,8 @@ def parse_args(argv=None):
     ap.add_argument("--out", default=DEFAULT_OUT, help="folder to save recordings in")
     ap.add_argument("--format", choices=list(FORMATS), default="mp3")
     ap.add_argument("--keep-tracks", action="store_true", help="also keep separate mic/meeting .flac files")
+    ap.add_argument("--no-folders", action="store_true",
+                    help="save recordings straight into --out instead of one folder per meeting")
     ap.add_argument("--duration", type=float, help="stop after this many seconds")
     ap.add_argument("--transcribe", action="store_true", help="also save a .txt transcript of each recording")
     ap.add_argument("--model", choices=list(MODELS), default=DEFAULT_MODEL,
@@ -45,7 +47,7 @@ def run(args):
         return
 
     def new_recorder():
-        return Recorder(args.out, args.mic, args.speaker, args.format)
+        return Recorder(args.out, args.mic, args.speaker, args.format, own_folder=not args.no_folders)
 
     def save(recorder):
         print("Saving…")

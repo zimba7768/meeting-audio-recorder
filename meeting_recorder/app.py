@@ -52,6 +52,7 @@ class App:
         self.fmt_var = tk.StringVar(value=s.get("format", "mp3"))
         self.auto_var = tk.BooleanVar(value=s.get("auto", True))
         self.tracks_var = tk.BooleanVar(value=s.get("keep_tracks", False))
+        self.folder_var = tk.BooleanVar(value=s.get("own_folder", True))
         self.transcribe_var = tk.BooleanVar(value=s.get("transcribe", True))
         self.model_var = tk.StringVar(value=s.get("model") if s.get("model") in MODELS else DEFAULT_MODEL)
         self.vocab_var = tk.StringVar(value=s.get("vocabulary", ""))
@@ -89,6 +90,8 @@ class App:
         ttk.Label(f, text="Format").grid(row=3, column=0, sticky="w")
         ttk.Combobox(f, textvariable=self.fmt_var, values=list(FORMATS), state="readonly",
                      width=8).grid(row=3, column=1, sticky="w", pady=2)
+        ttk.Checkbutton(f, text="Put each meeting in its own folder", variable=self.folder_var,
+                        command=self._save).grid(row=3, column=1, columnspan=2, sticky="e")
 
         ttk.Checkbutton(f, text="Automatically record Zoom and Teams meetings",
                         variable=self.auto_var, command=self._save).grid(row=4, column=0, columnspan=3, sticky="w", pady=(8, 0))
@@ -131,7 +134,8 @@ class App:
     def _save(self):
         save_settings({
             "mic": self.mic_var.get(), "speaker": self.speaker_var.get(), "out_dir": self.out_var.get(),
-            "format": self.fmt_var.get(), "auto": self.auto_var.get(), "keep_tracks": self.tracks_var.get(),
+            "format": self.fmt_var.get(), "own_folder": self.folder_var.get(),
+            "auto": self.auto_var.get(), "keep_tracks": self.tracks_var.get(),
             "transcribe": self.transcribe_var.get(), "model": self.model_var.get(),
             "vocabulary": self.vocab_var.get(),
         })
@@ -171,6 +175,7 @@ class App:
             mic_index=self._device_index(self.mic_var.get(), self.mics),
             speaker_index=self._device_index(self.speaker_var.get(), self.speakers),
             fmt=self.fmt_var.get(),
+            own_folder=self.folder_var.get(),
         )
         try:
             recorder.start(label)
