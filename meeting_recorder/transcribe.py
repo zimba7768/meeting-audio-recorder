@@ -12,14 +12,15 @@ import soundfile as sf
 import soxr
 
 WHISPER_RATE = 16000
-PAUSE_SECONDS = 1.5
+PAUSE_SECONDS = 1.5       # a pause this long starts a new paragraph
+PARAGRAPH_SECONDS = 60    # and no paragraph runs longer than this
 MODELS = {  # name: approximate download size
     "tiny": "75 MB",
     "base": "145 MB",
     "small": "465 MB",
     "medium": "1.5 GB",
 }
-DEFAULT_MODEL = "base"
+DEFAULT_MODEL = "small"
 
 _models = {}
 
@@ -45,9 +46,11 @@ def _load_audio(path):
     return np.concatenate(chunks)
 
 
-def _segments(model, path, language, progress):
-    segments, info = model.transcribe(_load_audio(path), language=language, vad_filter=True,
-                                      condition_on_previous_text=False, word_timestamps=True)
+def _segments(model, audio, language, vocabulary, progress):
+    """Return [(start, end, text)] pieces of speech, split wherever the words pause."""
+    segments, info = model.transcribe(audio, language=language, vad_filter=True,
+                                      condition_on_previous_text=False, word_timestamps=True,
+                                      hotwords=vocabulary or None)
     found = []
     for s in segments:
         # Whisper can glue together speech either side of a long silence (when the
@@ -80,6 +83,19 @@ def _is_echo(seg, others):
     return False
 
 
+def _paragraphs(tagged):
+    """Join consecutive pieces from one speaker into paragraphs, breaking at pauses."""
+    lines = []  # [start, end, speaker, text]
+    for (start, end, text), speaker in sorted(tagged, key=lambda x: x[0][0]):
+        last = lines[-1] if lines else None
+        if (last and last[2] == speaker and start - last[1] < PAUSE_SECONDS
+                and end - last[0] < PARAGRAPH_SECONDS):
+            last[1], last[3] = end, f"{last[3]} {text}"
+        else:
+            lines.append([start, end, speaker, text])
+    return lines
+
+
 def _stamp(seconds):
     s = int(seconds)
     return f"{s // 3600:02}:{s // 60 % 60:02}:{s % 60:02}"
@@ -90,48 +106,47 @@ def _write(path, title, lines):
         f.write(f"{title}\n\n")
         if not lines:
             f.write("(No speech was detected.)\n")
-        for start, speaker, text in lines:
+        for start, _, speaker, text in lines:
             f.write(f"[{_stamp(start)}] {speaker + ': ' if speaker else ''}{text}\n\n")
 
 
 def transcribe_meeting(meeting_track, mic_track, out_path, model_name=DEFAULT_MODEL, title="",
-                       progress=lambda fraction: None, status=lambda msg: None):
-    """Transcribe both tracks of a recording into one transcript labelled You / Others."""
+                       vocabulary="", progress=lambda fraction: None, status=lambda msg: None):
+    """Transcribe both tracks of a recording into one transcript labelled You / Others.
+
+    `vocabulary` is a comma-separated list of names and terms Whisper should expect.
+    """
     model = load_model(model_name, status)
     status("Transcribing…")
-    others, info = _segments(model, meeting_track, None, lambda f: progress(f / 2))
+    meeting_audio, mic_audio = _load_audio(meeting_track), _load_audio(mic_track)
+    others, info = _segments(model, meeting_audio, None, vocabulary, lambda f: progress(f / 2))
     language = info.language if others and info.language_probability > 0.5 else None
-    mine, _ = _segments(model, mic_track, language, lambda f: progress(0.5 + f / 2))
+    mine, _ = _segments(model, mic_audio, language, vocabulary, lambda f: progress(0.5 + f / 2))
     mine = [s for s in mine if not _is_echo(s, others)]
 
-    tagged = sorted([(s, "Others") for s in others] + [(s, "You") for s in mine], key=lambda x: x[0][0])
-    lines = []  # (start, speaker, text), joining consecutive lines from the same speaker
-    for (start, _, text), speaker in tagged:
-        if lines and lines[-1][1] == speaker:
-            lines[-1] = (lines[-1][0], speaker, f"{lines[-1][2]} {text}")
-        else:
-            lines.append((start, speaker, text))
+    lines = _paragraphs([(s, "Others") for s in others] + [(s, "You") for s in mine])
     _write(out_path, title or Path(out_path).stem, lines)
     return Path(out_path)
 
 
-def transcribe_file(audio_path, out_path=None, model_name=DEFAULT_MODEL,
+def transcribe_file(audio_path, out_path=None, model_name=DEFAULT_MODEL, vocabulary="",
                     progress=lambda fraction: None, status=lambda msg: None):
     """Transcribe any audio file (no speaker labels). Saves next to it as .txt by default."""
     out_path = Path(out_path or Path(audio_path).with_suffix(".txt"))
     model = load_model(model_name, status)
     status("Transcribing…")
-    segments, _ = _segments(model, audio_path, None, progress)
-    _write(out_path, Path(audio_path).stem, [(start, "", text) for start, _, text in segments])
+    segments, _ = _segments(model, _load_audio(audio_path), None, vocabulary, progress)
+    _write(out_path, Path(audio_path).stem, _paragraphs([(s, "") for s in segments]))
     return out_path
 
 
 def transcribe_recording(recording, model_name=DEFAULT_MODEL, keep_tracks=False, title="",
-                         progress=lambda fraction: None, status=lambda msg: None):
+                         vocabulary="", progress=lambda fraction: None, status=lambda msg: None):
     """Write <recording>.txt next to the audio, then remove the tracks unless asked to keep them."""
     try:
         return transcribe_meeting(recording.meeting_track, recording.mic_track,
-                                  recording.audio.with_suffix(".txt"), model_name, title, progress, status)
+                                  recording.audio.with_suffix(".txt"), model_name, title,
+                                  vocabulary, progress, status)
     finally:
         if not keep_tracks:
             recording.discard_tracks()

@@ -54,6 +54,7 @@ class App:
         self.tracks_var = tk.BooleanVar(value=s.get("keep_tracks", False))
         self.transcribe_var = tk.BooleanVar(value=s.get("transcribe", True))
         self.model_var = tk.StringVar(value=s.get("model") if s.get("model") in MODELS else DEFAULT_MODEL)
+        self.vocab_var = tk.StringVar(value=s.get("vocabulary", ""))
         self.status_var = tk.StringVar()
         self.transcribe_status_var = tk.StringVar()
 
@@ -101,9 +102,15 @@ class App:
         model = ttk.Combobox(transcribe, textvariable=self.model_var, values=list(MODELS), state="readonly", width=8)
         model.grid(row=0, column=1, padx=(4, 0))
         model.bind("<<ComboboxSelected>>", lambda _e: self._save())
+        ttk.Label(f, text="Vocabulary").grid(row=7, column=0, sticky="w", pady=(4, 0))
+        vocab = ttk.Entry(f, textvariable=self.vocab_var)
+        vocab.grid(row=7, column=1, columnspan=2, sticky="we", pady=(4, 0))
+        vocab.bind("<FocusOut>", lambda _e: self._save())
+        ttk.Label(f, text="Names and terms people say, separated by commas", foreground="#777"
+                  ).grid(row=8, column=1, columnspan=2, sticky="w")
 
         meters = ttk.Frame(f)
-        meters.grid(row=7, column=0, columnspan=3, sticky="we", pady=(10, 0))
+        meters.grid(row=9, column=0, columnspan=3, sticky="we", pady=(10, 0))
         self.meters = {}
         for row, (key, label) in enumerate((("meeting", "Meeting"), ("mic", "You"))):
             ttk.Label(meters, text=label, width=9).grid(row=row, column=0, sticky="w")
@@ -112,11 +119,11 @@ class App:
             self.meters[key] = bar
 
         self.button = ttk.Button(f, text="● Start recording", command=self.toggle)
-        self.button.grid(row=8, column=0, columnspan=2, sticky="we", pady=(12, 0), ipady=6)
-        ttk.Button(f, text="Open folder", command=self._open_folder).grid(row=8, column=2, sticky="e", pady=(12, 0), ipady=6)
-        ttk.Label(f, textvariable=self.status_var, foreground="#555").grid(row=9, column=0, columnspan=2, sticky="w", pady=(8, 0))
-        ttk.Button(f, text="Transcribe a file…", command=self._transcribe_file).grid(row=9, column=2, sticky="e", pady=(8, 0))
-        ttk.Label(f, textvariable=self.transcribe_status_var, foreground="#555").grid(row=10, column=0, columnspan=3, sticky="w")
+        self.button.grid(row=10, column=0, columnspan=2, sticky="we", pady=(12, 0), ipady=6)
+        ttk.Button(f, text="Open folder", command=self._open_folder).grid(row=10, column=2, sticky="e", pady=(12, 0), ipady=6)
+        ttk.Label(f, textvariable=self.status_var, foreground="#555").grid(row=11, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        ttk.Button(f, text="Transcribe a file…", command=self._transcribe_file).grid(row=11, column=2, sticky="e", pady=(8, 0))
+        ttk.Label(f, textvariable=self.transcribe_status_var, foreground="#555").grid(row=12, column=0, columnspan=3, sticky="w")
 
     def _device_index(self, name, devices):
         return next((d["index"] for d in devices if d["name"] == name), None)
@@ -126,6 +133,7 @@ class App:
             "mic": self.mic_var.get(), "speaker": self.speaker_var.get(), "out_dir": self.out_var.get(),
             "format": self.fmt_var.get(), "auto": self.auto_var.get(), "keep_tracks": self.tracks_var.get(),
             "transcribe": self.transcribe_var.get(), "model": self.model_var.get(),
+            "vocabulary": self.vocab_var.get(),
         })
         if not self.recorder:
             self._set_idle_status()
@@ -182,6 +190,7 @@ class App:
         self.status_var.set("Saving recording…")
         result = {}
         keep_tracks, transcribe, model = self.tracks_var.get(), self.transcribe_var.get(), self.model_var.get()
+        vocabulary = self.vocab_var.get()
 
         def work():
             try:
@@ -189,7 +198,7 @@ class App:
                 result["path"] = recording.audio
                 if transcribe:
                     self._queue_transcript(recording.audio.name, lambda progress, status: transcribe_recording(
-                        recording, model, keep_tracks, progress=progress, status=status))
+                        recording, model, keep_tracks, vocabulary=vocabulary, progress=progress, status=status))
                 elif not keep_tracks:
                     recording.discard_tracks()
             except Exception as e:
@@ -238,9 +247,9 @@ class App:
             initialdir=self.out_var.get(), title="Choose a recording to transcribe",
             filetypes=[("Audio", "*.mp3 *.wav *.flac *.ogg"), ("All files", "*.*")])
         if path:
-            model = self.model_var.get()
+            model, vocabulary = self.model_var.get(), self.vocab_var.get()
             self._queue_transcript(Path(path).name, lambda progress, status: transcribe_file(
-                path, model_name=model, progress=progress, status=status))
+                path, model_name=model, vocabulary=vocabulary, progress=progress, status=status))
 
     def _meeting_started(self, app):
         if self.auto_var.get() and not self.recorder:

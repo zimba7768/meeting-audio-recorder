@@ -23,6 +23,8 @@ def parse_args(argv=None):
     ap.add_argument("--transcribe", action="store_true", help="also save a .txt transcript of each recording")
     ap.add_argument("--model", choices=list(MODELS), default=DEFAULT_MODEL,
                     help="speech model for transcripts: bigger is more accurate but slower")
+    ap.add_argument("--vocabulary", default="", metavar="TERMS",
+                    help='names and terms to expect in transcripts, e.g. "CUI, DFARS, CMMC"')
     ap.add_argument("--transcribe-file", metavar="AUDIO", help="transcribe an existing audio file, then exit")
     return ap.parse_args(argv)
 
@@ -39,7 +41,7 @@ def run(args):
         return
 
     if args.transcribe_file:
-        print(f"Saved {transcribe_file(args.transcribe_file, model_name=args.model, status=print)}")
+        print(f"Saved {transcribe_file(args.transcribe_file, model_name=args.model, vocabulary=args.vocabulary, status=print)}")
         return
 
     def new_recorder():
@@ -50,7 +52,7 @@ def run(args):
         recording = recorder.stop()
         print(f"Saved {recording.audio}")
         if args.transcribe:
-            print(f"Saved {transcribe_recording(recording, args.model, args.keep_tracks, status=print)}")
+            print(f"Saved {transcribe_recording(recording, args.model, args.keep_tracks, vocabulary=args.vocabulary, status=print)}")
         elif not args.keep_tracks:
             recording.discard_tracks()
 

@@ -40,8 +40,10 @@ You can also press **Start recording** / **Stop recording** at any time to recor
 ```
 
 - **You / Others** labels come from the two separate recordings: your mic and the meeting audio. Individual people in the meeting aren't told apart; they all show as *Others*.
-- Transcription runs in the background after each meeting, and you can record the next meeting while it works. It runs on your processor. With the default **base** model, an hour-long meeting takes a few minutes on a typical PC.
-- **Accuracy** picks the speech model: `tiny` (fastest), `base` (default), `small` or `medium` (most accurate, slowest). Each model is downloaded once, the first time you use it (75 MB to 1.5 GB). After that it works offline.
+- Transcription runs in the background after each meeting, and you can record the next meeting while it works. It runs on your processor. With the default **small** model, a 45-minute meeting took about 4 minutes on an 8-core desktop.
+- **Accuracy** picks the speech model: `tiny` (fastest), `base`, `small` (default) or `medium` (most accurate, slowest). Each model is downloaded once, the first time you use it (75 MB to 1.5 GB). After that it works offline.
+- **Vocabulary:** list the acronyms, product names and people's names that come up in your meetings, separated by commas (e.g. `CUI, DFARS, CMMC, GCC High`). Whisper then expects those words and spells them the way you wrote them.
+- A new paragraph, with its own timestamp, starts at every pause and at least once a minute, so long stretches of other people talking stay readable.
 - The language is detected automatically. Whisper handles about 100 languages.
 - Untick **Transcribe to a text file** if you only want the audio.
 
@@ -86,7 +88,7 @@ python -m meeting_recorder --list-devices           # show mics and speakers
 python -m meeting_recorder --cli                    # record now, Ctrl+C to stop
 python -m meeting_recorder --auto --mic 30          # wait for meetings, use mic #30
 python -m meeting_recorder --cli --format flac --keep-tracks --out D:\Recordings
-python -m meeting_recorder --auto --transcribe --model small   # record and transcribe every meeting
+python -m meeting_recorder --auto --transcribe --vocabulary "CUI, DFARS, CMMC"   # record and transcribe every meeting
 python -m meeting_recorder --transcribe-file "old meeting.mp3"   # transcribe an existing file
 ```
 
