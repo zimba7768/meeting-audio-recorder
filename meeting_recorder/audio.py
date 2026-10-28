@@ -6,6 +6,7 @@ audio going to your speakers/headset, so it works with Zoom, Teams or anything e
 import queue
 import threading
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -41,6 +42,18 @@ def list_devices():
         return mics, speakers, wasapi["defaultInputDevice"], wasapi["defaultOutputDevice"]
     finally:
         p.terminate()
+
+
+@dataclass
+class Recording:
+    """A finished recording: the mixed file plus the separate meeting and mic tracks."""
+    audio: Path
+    meeting_track: Path
+    mic_track: Path
+
+    def discard_tracks(self):
+        for path in (self.meeting_track, self.mic_track):
+            path.unlink(missing_ok=True)
 
 
 class _Track:
@@ -128,15 +141,14 @@ class _Source:
 
 
 class Recorder:
-    """Records meeting audio + microphone. Call start(), then stop() to get the saved file."""
+    """Records meeting audio + microphone. Call start(), then stop() to get the saved Recording."""
 
     def __init__(self, out_dir, mic_index=None, speaker_index=None, fmt="mp3",
-                 keep_tracks=False, mic_gain=1.0, meeting_gain=1.0):
+                 mic_gain=1.0, meeting_gain=1.0):
         self.out_dir = Path(out_dir)
         self.mic_index = mic_index
         self.speaker_index = speaker_index
         self.fmt = fmt
-        self.keep_tracks = keep_tracks
         self.mic_gain = mic_gain
         self.meeting_gain = meeting_gain
         self.started_at = None
@@ -200,7 +212,11 @@ class Recorder:
             self._p = None
 
     def stop(self):
-        """Stop recording, mix both tracks and return the path of the saved file."""
+        """Stop recording and mix both tracks into one file.
+
+        The separate tracks stay on disk; call discard_tracks() on the result when
+        you no longer need them (they are used for transcription).
+        """
         if not self.recording:
             return None
         tracks = dict(self._tracks)
@@ -210,10 +226,7 @@ class Recorder:
 
         out_path = Path(f"{self._base}.{self.fmt}")
         _mix(tracks, out_path, self.fmt, {"meeting": self.meeting_gain, "mic": self.mic_gain})
-        if not self.keep_tracks:
-            for track in tracks.values():
-                Path(track.path).unlink(missing_ok=True)
-        return out_path
+        return Recording(out_path, Path(tracks["meeting"].path), Path(tracks["mic"].path))
 
 
 def _mix(tracks, out_path, fmt, gains):

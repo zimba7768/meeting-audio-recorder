@@ -4,6 +4,7 @@ import time
 
 from .audio import FORMATS, Recorder, list_devices
 from .detect import MeetingWatcher
+from .transcribe import DEFAULT_MODEL, MODELS, transcribe_file, transcribe_recording
 
 DEFAULT_OUT = "Meeting Recordings"
 
@@ -19,6 +20,10 @@ def parse_args(argv=None):
     ap.add_argument("--format", choices=list(FORMATS), default="mp3")
     ap.add_argument("--keep-tracks", action="store_true", help="also keep separate mic/meeting .flac files")
     ap.add_argument("--duration", type=float, help="stop after this many seconds")
+    ap.add_argument("--transcribe", action="store_true", help="also save a .txt transcript of each recording")
+    ap.add_argument("--model", choices=list(MODELS), default=DEFAULT_MODEL,
+                    help="speech model for transcripts: bigger is more accurate but slower")
+    ap.add_argument("--transcribe-file", metavar="AUDIO", help="transcribe an existing audio file, then exit")
     return ap.parse_args(argv)
 
 
@@ -33,8 +38,21 @@ def run(args):
             print(f"  {d['index']:>3}  {d['name']}{'  (default)' if d['index'] == default_speaker else ''}")
         return
 
+    if args.transcribe_file:
+        print(f"Saved {transcribe_file(args.transcribe_file, model_name=args.model, status=print)}")
+        return
+
     def new_recorder():
-        return Recorder(args.out, args.mic, args.speaker, args.format, args.keep_tracks)
+        return Recorder(args.out, args.mic, args.speaker, args.format)
+
+    def save(recorder):
+        print("Saving…")
+        recording = recorder.stop()
+        print(f"Saved {recording.audio}")
+        if args.transcribe:
+            print(f"Saved {transcribe_recording(recording, args.model, args.keep_tracks, status=print)}")
+        elif not args.keep_tracks:
+            recording.discard_tracks()
 
     if not args.auto:
         recorder = new_recorder().start("Recording")
@@ -44,8 +62,7 @@ def run(args):
                 time.sleep(0.2)
         except KeyboardInterrupt:
             pass
-        print("Saving…")
-        print(f"Saved {recorder.stop()}")
+        save(recorder)
         return
 
     state = {"recorder": None}
@@ -55,8 +72,8 @@ def run(args):
         state["recorder"] = new_recorder().start(app)
 
     def ended(app):
-        print(f"{app} meeting ended — saving…")
-        print(f"Saved {state['recorder'].stop()}")
+        print(f"{app} meeting ended.")
+        save(state["recorder"])
         state["recorder"] = None
 
     watcher = MeetingWatcher(started, ended)
@@ -67,5 +84,4 @@ def run(args):
             time.sleep(3)
     except KeyboardInterrupt:
         if state["recorder"]:
-            print("Saving…")
-            print(f"Saved {state['recorder'].stop()}")
+            save(state["recorder"])

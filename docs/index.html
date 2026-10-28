@@ -42,19 +42,20 @@
 <body>
 <main>
   <h1>Meeting Audio Recorder</h1>
-  <p class="lead">Record audio only from your Zoom and Microsoft Teams meetings on Windows: the other people's voices and your own microphone, saved as one MP3 per meeting. It's free and open source.</p>
+  <p class="lead">Record audio only from your Zoom and Microsoft Teams meetings on Windows: the other people's voices and your own microphone, saved as one MP3 per meeting, plus a text transcript. It's free and open source.</p>
 
   <div class="buttons">
     <a class="btn primary" href="https://github.com/zimba7768/meeting-audio-recorder/releases/latest">Download for Windows</a>
     <a class="btn" href="https://github.com/zimba7768/meeting-audio-recorder">View source on GitHub</a>
   </div>
 
-  <img class="shot" src="screenshot.png" width="466" height="344" alt="The Meeting Audio Recorder window showing microphone and speaker choices, level meters and a Stop recording button">
+  <img class="shot" src="screenshot.png" width="488" height="392" alt="The Meeting Audio Recorder window showing microphone and speaker choices, level meters and a Stop recording button">
 
   <h2>What it does</h2>
   <div class="grid">
     <div class="card"><h3>Records meetings automatically</h3><p>Starts when a Zoom or Teams meeting begins and saves when it ends.</p></div>
     <div class="card"><h3>Captures both sides</h3><p>Records what you hear through your speakers or headset, plus your USB mic, mixed into one file.</p></div>
+    <div class="card"><h3>Writes a transcript</h3><p>Saves a <code>.txt</code> file for each meeting, with each line marked <em>You</em> or <em>Others</em>. Whisper makes it on your PC.</p></div>
     <div class="card"><h3>Stays on your PC</h3><p>It doesn't use bots, plugins, accounts or the cloud. Files are saved to <code>Documents\Meeting Recordings</code>.</p></div>
     <div class="card"><h3>Small files</h3><p>About 1 MB per minute as MP3. WAV and FLAC are also available, plus optional separate tracks.</p></div>
   </div>
@@ -64,11 +65,12 @@
     <li>Download <code>MeetingAudioRecorder.exe</code> and run it. If Windows SmartScreen warns you, choose <em>More info → Run anyway</em>.</li>
     <li>Pick your microphone and the speakers or headset you hear meetings through.</li>
     <li>Leave <em>Automatically record Zoom and Teams meetings</em> ticked and keep the window open.</li>
-    <li>Join a meeting. When you leave, the recording is saved.</li>
+    <li>Join a meeting. When you leave, the recording is saved, and a few minutes later the transcript appears next to it.</li>
   </ol>
 
   <h2>How it works</h2>
   <p>The app uses Windows' built-in <strong>WASAPI loopback</strong> to capture the audio going to your speakers, and records your microphone at the same time. To spot meetings, it checks the microphone-usage information Windows already keeps (the same information behind the mic icon in the taskbar). Zoom and Teams hold the mic open for the whole meeting, even while you're muted.</p>
+  <p>Transcripts are made with <a href="https://github.com/SYSTRAN/faster-whisper">faster-whisper</a>, which runs entirely offline after a one-time model download. Your mic and the meeting audio are transcribed separately, which is how each line gets its <em>You</em> or <em>Others</em> label.</p>
 
   <h2>Please get consent</h2>
   <p class="note">Recording laws vary, and many places require everyone on the call to agree. Tell participants you're recording, and follow your organization's policies.</p>

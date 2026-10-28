@@ -1,6 +1,7 @@
 """Small Tkinter window: pick your mic, press Record, or let it auto-record meetings."""
 import json
 import os
+import queue
 import threading
 import tkinter as tk
 from pathlib import Path
@@ -9,6 +10,7 @@ from tkinter import filedialog, messagebox, ttk
 from . import __version__
 from .audio import FORMATS, Recorder, list_devices
 from .detect import MeetingWatcher
+from .transcribe import DEFAULT_MODEL, MODELS, transcribe_file, transcribe_recording
 
 SETTINGS_PATH = Path(os.environ.get("APPDATA", Path.home())) / "MeetingAudioRecorder" / "settings.json"
 DEFAULT_OUT = Path.home() / "Documents" / "Meeting Recordings"
@@ -35,6 +37,12 @@ class App:
         self.auto_started = False
         self.saving = False
         self.watcher = MeetingWatcher(self._meeting_started, self._meeting_ended)
+        # Transcripts are made one at a time on a background thread, so a new
+        # meeting can be recorded while the last one is still being transcribed.
+        self.jobs = queue.Queue()
+        self.jobs_pending = 0
+        self.transcribe_status = ""
+        threading.Thread(target=self._transcribe_worker, daemon=True).start()
 
         s = load_settings()
         self.mics, self.speakers, _, _ = list_devices()
@@ -44,7 +52,10 @@ class App:
         self.fmt_var = tk.StringVar(value=s.get("format", "mp3"))
         self.auto_var = tk.BooleanVar(value=s.get("auto", True))
         self.tracks_var = tk.BooleanVar(value=s.get("keep_tracks", False))
+        self.transcribe_var = tk.BooleanVar(value=s.get("transcribe", True))
+        self.model_var = tk.StringVar(value=s.get("model") if s.get("model") in MODELS else DEFAULT_MODEL)
         self.status_var = tk.StringVar()
+        self.transcribe_status_var = tk.StringVar()
 
         root.title(f"Meeting Audio Recorder {__version__}")
         root.resizable(False, False)
@@ -83,8 +94,16 @@ class App:
         ttk.Checkbutton(f, text="Also keep separate mic and meeting tracks (.flac)",
                         variable=self.tracks_var, command=self._save).grid(row=5, column=0, columnspan=3, sticky="w")
 
+        transcribe = ttk.Frame(f)
+        transcribe.grid(row=6, column=0, columnspan=3, sticky="we")
+        ttk.Checkbutton(transcribe, text="Transcribe to a text file (.txt)  —  accuracy:",
+                        variable=self.transcribe_var, command=self._save).grid(row=0, column=0, sticky="w")
+        model = ttk.Combobox(transcribe, textvariable=self.model_var, values=list(MODELS), state="readonly", width=8)
+        model.grid(row=0, column=1, padx=(4, 0))
+        model.bind("<<ComboboxSelected>>", lambda _e: self._save())
+
         meters = ttk.Frame(f)
-        meters.grid(row=6, column=0, columnspan=3, sticky="we", pady=(10, 0))
+        meters.grid(row=7, column=0, columnspan=3, sticky="we", pady=(10, 0))
         self.meters = {}
         for row, (key, label) in enumerate((("meeting", "Meeting"), ("mic", "You"))):
             ttk.Label(meters, text=label, width=9).grid(row=row, column=0, sticky="w")
@@ -93,9 +112,11 @@ class App:
             self.meters[key] = bar
 
         self.button = ttk.Button(f, text="● Start recording", command=self.toggle)
-        self.button.grid(row=7, column=0, columnspan=2, sticky="we", pady=(12, 0), ipady=6)
-        ttk.Button(f, text="Open folder", command=self._open_folder).grid(row=7, column=2, sticky="e", pady=(12, 0), ipady=6)
-        ttk.Label(f, textvariable=self.status_var, foreground="#555").grid(row=8, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        self.button.grid(row=8, column=0, columnspan=2, sticky="we", pady=(12, 0), ipady=6)
+        ttk.Button(f, text="Open folder", command=self._open_folder).grid(row=8, column=2, sticky="e", pady=(12, 0), ipady=6)
+        ttk.Label(f, textvariable=self.status_var, foreground="#555").grid(row=9, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        ttk.Button(f, text="Transcribe a file…", command=self._transcribe_file).grid(row=9, column=2, sticky="e", pady=(8, 0))
+        ttk.Label(f, textvariable=self.transcribe_status_var, foreground="#555").grid(row=10, column=0, columnspan=3, sticky="w")
 
     def _device_index(self, name, devices):
         return next((d["index"] for d in devices if d["name"] == name), None)
@@ -104,6 +125,7 @@ class App:
         save_settings({
             "mic": self.mic_var.get(), "speaker": self.speaker_var.get(), "out_dir": self.out_var.get(),
             "format": self.fmt_var.get(), "auto": self.auto_var.get(), "keep_tracks": self.tracks_var.get(),
+            "transcribe": self.transcribe_var.get(), "model": self.model_var.get(),
         })
         if not self.recorder:
             self._set_idle_status()
@@ -141,7 +163,6 @@ class App:
             mic_index=self._device_index(self.mic_var.get(), self.mics),
             speaker_index=self._device_index(self.speaker_var.get(), self.speakers),
             fmt=self.fmt_var.get(),
-            keep_tracks=self.tracks_var.get(),
         )
         try:
             recorder.start(label)
@@ -160,10 +181,17 @@ class App:
         self.button.configure(text="● Start recording", state="disabled")
         self.status_var.set("Saving recording…")
         result = {}
+        keep_tracks, transcribe, model = self.tracks_var.get(), self.transcribe_var.get(), self.model_var.get()
 
         def work():
             try:
-                result["path"] = recorder.stop()
+                recording = recorder.stop()
+                result["path"] = recording.audio
+                if transcribe:
+                    self._queue_transcript(recording.audio.name, lambda progress, status: transcribe_recording(
+                        recording, model, keep_tracks, progress=progress, status=status))
+                elif not keep_tracks:
+                    recording.discard_tracks()
             except Exception as e:
                 result["error"] = e
             self.root.after(0, done)
@@ -180,6 +208,39 @@ class App:
                 bar["value"] = 0
 
         threading.Thread(target=work, daemon=True).start()
+
+    # Transcription -----------------------------------------------------------
+
+    def _queue_transcript(self, name, job):
+        self.jobs_pending += 1
+        self.transcribe_status = f"Waiting to transcribe {name}…"
+        self.jobs.put((name, job))
+
+    def _transcribe_worker(self):
+        while True:
+            name, job = self.jobs.get()
+
+            def status(msg):
+                self.transcribe_status = msg
+
+            def progress(fraction):
+                self.transcribe_status = f"Transcribing {name}… {int(fraction * 100)}%"
+
+            try:
+                path = job(progress, status)
+                self.transcribe_status = f"Transcript saved: {path.name}"
+            except Exception as e:
+                self.transcribe_status = f"Transcription failed: {e}"
+            self.jobs_pending -= 1
+
+    def _transcribe_file(self):
+        path = filedialog.askopenfilename(
+            initialdir=self.out_var.get(), title="Choose a recording to transcribe",
+            filetypes=[("Audio", "*.mp3 *.wav *.flac *.ogg"), ("All files", "*.*")])
+        if path:
+            model = self.model_var.get()
+            self._queue_transcript(Path(path).name, lambda progress, status: transcribe_file(
+                path, model_name=model, progress=progress, status=status))
 
     def _meeting_started(self, app):
         if self.auto_var.get() and not self.recorder:
@@ -201,6 +262,8 @@ class App:
             self.status_var.set(f"{what} — {seconds // 3600}:{seconds // 60 % 60:02}:{seconds % 60:02}")
             for key, level in self.recorder.levels().items():
                 self.meters[key]["value"] = min(1.0, level * 1.5)
+        if self.transcribe_status_var.get() != self.transcribe_status:
+            self.transcribe_status_var.set(self.transcribe_status)
         self.root.after(100, self._tick)
 
     def close(self):
@@ -209,6 +272,12 @@ class App:
                 return
             self.stop()
             self._quit_when_saved()
+        elif self.jobs_pending:
+            if messagebox.askyesno("Transcription in progress",
+                                   "A transcript is still being made. Quit anyway?\n\n"
+                                   "The audio is already saved. You can transcribe it later "
+                                   "with “Transcribe a file…”."):
+                self.root.destroy()
         else:
             self.root.destroy()
 
